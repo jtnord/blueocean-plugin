@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<archetype-descriptor xsi:schemaLocation="http://maven.apache.org/plugins/maven-archetype-plugin/archetype-descriptor/1.0.0 http://maven.apache.org/xsd/archetype-descriptor-1.0.0.xsd" name="blueocean-plugin-archetype"
+    xmlns="http://maven.apache.org/plugins/maven-archetype-plugin/archetype-descriptor/1.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <fileSets>
+    <fileSet filtered="true" encoding="UTF-8">
+      <directory></directory>
+      <includes>
+        <include>**/*.xml</include>
+        <include>**/*.yaml</include>
+        <include>**/*.json</include>
+        <include>.babelrc</include>
+        <include>**/*.js</include>
+        <include>**/*.jsx</include>
+        <include>.editorconfig</include>
+        <include>**/*.jelly</include>
+        <include>**/*.less</include>
+        <include>.eslintrc</include>
+        <include>gulpfile.js</include>
+        <include>package.json</include>
+      </includes>
+    </fileSet>
+  </fileSets>
+</archetype-descriptor>
