@@ -1,8 +1,8 @@
 {
-    "name": "$artifact",
-    "version": "0.1",
+    "name": "$artifactId",
+    "version": "0.0.1",
     "scripts": {
-        "storybook": "start-storybook -p 9001 -s node_modules/@jenkins-cd/design-language/dist/assets/,target/classes/org/jenkins/ui/jsmodules/$artifact/",
+        "storybook": "start-storybook -p 9001 -s node_modules/@jenkins-cd/design-language/dist/assets/,target/classes/org/jenkins/ui/jsmodules/$artifactId/",
         "lint": "gulp lint",
         "lint:fix": "gulp lint --fixLint",
         "lint:watch": "gulp lint:watch --continueOnLint",
