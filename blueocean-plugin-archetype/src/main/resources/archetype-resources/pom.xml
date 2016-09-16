@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <parent>
+    <groupId>org.jenkins-ci.plugins</groupId>
+    <artifactId>plugin</artifactId>
+    <version>2.10</version>
+  </parent>
+  
+
+  <name>YOUR_PLUGIN_NAME</name>
+  <groupId>$io.jenkins.blueocean</groupId>
+  <version>0.1-SNAPSHOT</version>
+
+  <artifactId>$archetype</artifactId>
+  <packaging>hpi</packaging>
+
+  <url>https://wiki.jenkins-ci.org/display/JENKINS/YOUR_WIKI_URL</url>
+
+
+  <properties>
+    <jenkins.version>2.7.1</jenkins.version>
+    <node.version>5.8.0</node.version>
+    <npm.version>3.7.3</npm.version>
+  </properties>
+
+</project>

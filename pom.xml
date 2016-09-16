@@ -107,6 +107,7 @@
     <module>blueocean-config</module>
     <module>blueocean</module>
     <module>blueocean-jwt</module>
+    <module>blueocean-plugin-archetype</module>
   </modules>
 
   <repositories>
