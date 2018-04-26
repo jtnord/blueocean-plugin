@@ -57,45 +57,56 @@ public class JwtAuthenticationFilter implements Filter {
     public void doFilter(ServletRequest req, ServletResponse rsp, FilterChain chain) throws IOException, ServletException {
         HttpServletRequest request = (HttpServletRequest) req;
 
-        if(!shouldApply(request)) {
-            chain.doFilter(req,rsp);
-            return;
-        }
+//        if(!shouldApply(request)) {
+//            chain.doFilter(req,rsp);
+//            return;
+//        }
 
 
-        Authentication token = verifyToken(request);
-
-        if(token==null) {
-            // no JWT token found, which is fine --- we just assume the request is authenticated in other means
-            // Some routes that require valid JWT token will check for the presence of JWT token during Stapler
-            // request routing, not here.
-            chain.doFilter(req,rsp);
-            return;
-        }
-
-        // run the rest of the request with the new identity
-        // create a new context and set it to holder to not clobber existing context
-        SecurityContext sc = new SecurityContextImpl();
-        sc.setAuthentication(token);
-        SecurityContext previous = SecurityContextHolder.getContext();
-        SecurityContextHolder.setContext(sc);
-        request.setAttribute(JWT_TOKEN_VALIDATED,true);
         try {
-            chain.doFilter(req,rsp);
-        } finally {
-            if(previous != null){
-                SecurityContextHolder.setContext(previous);
-            }else {
-                SecurityContextHolder.clearContext();
+            Authentication token = verifyToken(request);
+
+            if (token == null) {
+                // no JWT token found, which is fine --- we just assume the request is authenticated in other means
+                // Some routes that require valid JWT token will check for the presence of JWT token during Stapler
+                // request routing, not here.
+                chain.doFilter(req, rsp);
+                return;
             }
+
+            // run the rest of the request with the new identity
+            // create a new context and set it to holder to not clobber existing context
+            SecurityContext sc = new SecurityContextImpl();
+            sc.setAuthentication(token);
+            SecurityContext previous = SecurityContextHolder.getContext();
+            SecurityContextHolder.setContext(sc);
+            request.setAttribute(JWT_TOKEN_VALIDATED, true);
+            try {
+                chain.doFilter(req, rsp);
+            } finally {
+                if (previous != null) {
+                    SecurityContextHolder.setContext(previous);
+                } else {
+                    SecurityContextHolder.clearContext();
+                }
+            }
+        } catch (Throwable t) {
+            // Something bad happened when processing the filter, like the token is bogus
+            // Continue with other authenticators
+            chain.doFilter(req, rsp);
         }
     }
 
     private Authentication verifyToken(HttpServletRequest request) {
         for (JwtTokenVerifier verifier : JwtTokenVerifier.all()) {
-            Authentication token = verifier.verify(request);
-            if (token != null)
-                return token;
+            try {
+                Authentication token = verifier.verify(request);
+                if (token != null)
+                    return token;
+            }
+            catch (Throwable t) {
+                //noop
+            }
         }
         return null;
     }
@@ -104,8 +115,8 @@ public class JwtAuthenticationFilter implements Filter {
      * Returns true for requests that JWT token processing should apply.
      */
     protected boolean shouldApply(HttpServletRequest req) {
-        if (!isJwtEnabled)
-            return false;
+//        if (!isJwtEnabled)
+//            return false;
 
         String path = req.getRequestURI().substring(req.getContextPath().length());
         if(!StringUtils.isBlank(path)){
