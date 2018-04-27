@@ -2,10 +2,8 @@ package io.jenkins.blueocean.auth.jwt.impl.external;
 
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 import net.sf.json.JSONException;
 import net.sf.json.JSONObject;
 import org.jose4j.jwk.HttpsJwks;
@@ -32,7 +30,7 @@ public final class ExternalJWTConfiguration extends GlobalConfiguration {
     private static final String[] DEFAULT_EXPECTED_AUDIENCE = { "authproxy", "jenkins" };
 
     private String ssoUri = DEFAULT_SSO_URI;
-    private List<String> audience = Arrays.asList(DEFAULT_EXPECTED_AUDIENCE);
+    private String[] audience = DEFAULT_EXPECTED_AUDIENCE;
 
     private transient volatile JwtConsumer jwtConsumer;
 
@@ -54,7 +52,7 @@ public final class ExternalJWTConfiguration extends GlobalConfiguration {
     }
 
     @Restricted(NoExternalUse.class) // public for form binding only
-    public List<String> getAudience() {
+    public String[] getAudience() {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
         return audience;
     }
@@ -69,8 +67,8 @@ public final class ExternalJWTConfiguration extends GlobalConfiguration {
             .setAllowedClockSkewInSeconds(30) // allow some leeway in validating time based claims to account for clock skew
             .setRequireSubject() // the JWT must have a subject claim
             .setVerificationKeyResolver( new HttpsJwksVerificationKeyResolver(new HttpsJwks(ssoUri)));
-        if (!audience.isEmpty()) {
-            builder.setExpectedAudience(audience.toArray(new String[audience.size()]));
+        if (audience.length != 0) {
+            builder.setExpectedAudience(audience);
         }
         jwtConsumer = builder.build(); // create the JwtConsumer instance
     }
@@ -92,8 +90,8 @@ public final class ExternalJWTConfiguration extends GlobalConfiguration {
     @SuppressWarnings("unused")
     public FormValidation doCheckAudience(@QueryParameter String value) {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
-        List<String> strings = toStringList(value);
-        if (strings.isEmpty()) {
+        String[] strings = toStringArr(value);
+        if (strings.length == 0) {
             return FormValidation.warning("No audiences are set - this will allow tokens from any application on the "
                                           + "SSO server to login.  You should not do this unless the SSO server is "
                                           + "suitable restricted (e.g. Google.com is not)");
@@ -106,7 +104,7 @@ public final class ExternalJWTConfiguration extends GlobalConfiguration {
     public boolean configure(StaplerRequest req, JSONObject json) throws FormException {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
         String _ssoUri;
-        List<String> _audience;
+        String[] _audience;
         try {
             _ssoUri = json.getString("ssoUri");
             FormValidation fv = doCheckSsoUri(_ssoUri);
@@ -122,7 +120,7 @@ public final class ExternalJWTConfiguration extends GlobalConfiguration {
             if (FormValidation.Kind.ERROR == fv.kind) {
                 throw new FormException(fv.getMessage(), fv.getCause(), "audience");
             }
-            _audience = toStringList(rawAudience);
+            _audience = toStringArr(rawAudience);
         } catch (JSONException jex) {
             throw new FormException(jex, "audience");
         }
@@ -139,18 +137,18 @@ public final class ExternalJWTConfiguration extends GlobalConfiguration {
     }
 
     @Restricted(NoExternalUse.class) // public for jelly access workaround JENKINS-27901
-    public String joinWithNewLines(List<String> strArr) {
+    public String joinWithNewLines(String[] strArr) {
         return String.join("\n", strArr);
     }
 
-    private static List<String> toStringList(String newLineSeparatedValues) {
+    private static String[] toStringArr(String newLineSeparatedValues) {
         if (newLineSeparatedValues == null) {
             return null;
         }
-        List<String> values = Arrays.stream(newLineSeparatedValues.split("\r?\n"))
+        String[] values = Arrays.stream(newLineSeparatedValues.split("\r?\n"))
                                                     .map(String::trim)
                                                     .filter(line -> !line.isEmpty())
-                                                    .collect(Collectors.toList());
+                                                    .toArray(size -> new String[size]);
         return values;
     }
 }
