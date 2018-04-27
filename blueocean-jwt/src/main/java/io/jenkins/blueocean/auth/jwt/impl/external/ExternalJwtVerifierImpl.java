@@ -1,5 +1,6 @@
 package io.jenkins.blueocean.auth.jwt.impl.external;
 
+import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import io.jenkins.blueocean.auth.jwt.JwtTokenVerifier;
 import io.jenkins.blueocean.commons.ServiceException;
@@ -14,7 +15,6 @@ import org.jose4j.lang.JoseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import hudson.Extension;
-import hudson.ExtensionList;
 import hudson.model.User;
 import jenkins.model.Jenkins;
 
@@ -25,6 +25,9 @@ import jenkins.model.Jenkins;
 public class ExternalJwtVerifierImpl extends JwtTokenVerifier {
 
     private static final Logger logger = LoggerFactory.getLogger(ExternalJwtVerifierImpl.class);
+
+    @Inject
+    private ExternalJWTConfiguration config;
 
     @Override
     public Authentication verify(HttpServletRequest request) {
@@ -38,7 +41,6 @@ public class ExternalJwtVerifierImpl extends JwtTokenVerifier {
             return null;
         }
         try {
-            final ExternalJWTConfiguration config = ExtensionList.lookupSingleton(ExternalJWTConfiguration.class);
             JwtConsumer jwtConsumer = config.getJwtConsumer();
 
             try {
