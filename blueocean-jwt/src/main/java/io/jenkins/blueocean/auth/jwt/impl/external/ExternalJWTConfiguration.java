@@ -64,13 +64,15 @@ public final class ExternalJWTConfiguration extends GlobalConfiguration {
     }
 
     private void buildConsumer() {
-        jwtConsumer = new JwtConsumerBuilder()
+        JwtConsumerBuilder builder = new JwtConsumerBuilder()
             .setRequireExpirationTime() // the JWT must have an expiration time
             .setAllowedClockSkewInSeconds(30) // allow some leeway in validating time based claims to account for clock skew
             .setRequireSubject() // the JWT must have a subject claim
-            .setVerificationKeyResolver( new HttpsJwksVerificationKeyResolver(new HttpsJwks(ssoUri)))
-            .setExpectedAudience(audience.toArray(new String[audience.size()]))
-            .build(); // create the JwtConsumer instance
+            .setVerificationKeyResolver( new HttpsJwksVerificationKeyResolver(new HttpsJwks(ssoUri)));
+        if (!audience.isEmpty()) {
+            builder.setExpectedAudience(audience.toArray(new String[audience.size()]));
+        }
+        jwtConsumer = builder.build(); // create the JwtConsumer instance
     }
 
     @Restricted(NoExternalUse.class) // public for form binding only
@@ -90,7 +92,12 @@ public final class ExternalJWTConfiguration extends GlobalConfiguration {
     @SuppressWarnings("unused")
     public FormValidation doCheckAudience(@QueryParameter String value) {
         Jenkins.get().checkPermission(Jenkins.ADMINISTER);
-        // TODO what validation can we have here?
+        List<String> strings = toStringList(value);
+        if (strings.isEmpty()) {
+            return FormValidation.warning("No audiences are set - this will allow tokens from any application on the "
+                                          + "SSO server to login.  You should not do this unless the SSO server is "
+                                          + "suitable restricted (e.g. Google.com is not)");
+        }
         return FormValidation.ok();
     }
 
