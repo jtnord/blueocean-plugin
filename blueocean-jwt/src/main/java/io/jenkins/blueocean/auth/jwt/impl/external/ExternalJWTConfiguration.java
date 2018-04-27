@@ -5,6 +5,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 import net.sf.json.JSONException;
 import net.sf.json.JSONObject;
 import org.jose4j.jwk.HttpsJwks;
@@ -27,7 +28,7 @@ import jenkins.model.Jenkins;
 @Extension
 public final class ExternalJWTConfiguration extends GlobalConfiguration {
 
-    private static final String DEFAULT_SSO_URI = "http://dex.sso/";
+    private static final String DEFAULT_SSO_URI = "http://dex.sso/"; // k8s service.namespace
     private static final String[] DEFAULT_EXPECTED_AUDIENCE = { "authproxy", "jenkins" };
 
     private String ssoUri = DEFAULT_SSO_URI;
@@ -139,13 +140,10 @@ public final class ExternalJWTConfiguration extends GlobalConfiguration {
         if (newLineSeparatedValues == null) {
             return null;
         }
-        ArrayList<String> values = new ArrayList<>();
-        for (String line : newLineSeparatedValues.split("\r?\n")) {
-            line = line.trim();
-            if (!line.isEmpty()) {
-                values.add(line);
-            }
-        }
+        List<String> values = Arrays.stream(newLineSeparatedValues.split("\r?\n"))
+                                                    .map(String::trim)
+                                                    .filter(line -> !line.isEmpty())
+                                                    .collect(Collectors.toList());
         return values;
     }
 }
