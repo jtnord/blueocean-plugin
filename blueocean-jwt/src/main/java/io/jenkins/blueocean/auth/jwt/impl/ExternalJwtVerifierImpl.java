@@ -1,8 +1,16 @@
 package io.jenkins.blueocean.auth.jwt.impl;
 
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import javax.servlet.http.HttpServletRequest;
 import io.jenkins.blueocean.auth.jwt.JwtTokenVerifier;
 import io.jenkins.blueocean.commons.ServiceException;
+import net.sf.json.JSONArray;
+import net.sf.json.JSONException;
+import net.sf.json.JSONObject;
 import org.acegisecurity.Authentication;
 import org.jose4j.jwk.HttpsJwks;
 import org.jose4j.jwt.JwtClaims;
@@ -14,10 +22,18 @@ import org.jose4j.jwt.consumer.JwtContext;
 import org.jose4j.jwx.JsonWebStructure;
 import org.jose4j.keys.resolvers.HttpsJwksVerificationKeyResolver;
 import org.jose4j.lang.JoseException;
+import org.kohsuke.accmod.Restricted;
+import org.kohsuke.accmod.restrictions.NoExternalUse;
+import org.kohsuke.stapler.QueryParameter;
+import org.kohsuke.stapler.StaplerRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import hudson.Extension;
+import hudson.ExtensionList;
 import hudson.model.User;
+import hudson.util.FormValidation;
+import jenkins.model.GlobalConfiguration;
+import jenkins.model.GlobalConfigurationCategory;
 import jenkins.model.Jenkins;
 
 /**
@@ -27,11 +43,6 @@ import jenkins.model.Jenkins;
 public class ExternalJwtVerifierImpl extends JwtTokenVerifier {
 
     private static final Logger logger = LoggerFactory.getLogger(ExternalJwtVerifierImpl.class);
-
-    // FIXME - static hacks
-    private static final HttpsJwksVerificationKeyResolver httpsJwksKeyResolver =
-        new HttpsJwksVerificationKeyResolver(new HttpsJwks("http://35.189.197.59/keys"));
-    private static final String[] expectedAudience = { "authproxy", "jenkins" };
 
     @Override
     public Authentication verify(HttpServletRequest request) {
@@ -45,13 +56,8 @@ public class ExternalJwtVerifierImpl extends JwtTokenVerifier {
             return null;
         }
         try {
-            JwtConsumer jwtConsumer = new JwtConsumerBuilder()
-                .setRequireExpirationTime() // the JWT must have an expiration time
-                .setAllowedClockSkewInSeconds(30) // allow some leeway in validating time based claims to account for clock skew
-                .setRequireSubject() // the JWT must have a subject claim
-                .setVerificationKeyResolver(httpsJwksKeyResolver).setExpectedAudience(expectedAudience)
-                .setExpectedAudience(expectedAudience)
-                .build(); // create the JwtConsumer instance
+            final GlobalConfigurationImpl config = ExtensionList.lookupSingleton(GlobalConfigurationImpl.class);
+            JwtConsumer jwtConsumer = config.getJwtConsumer();
 
             try {
                 JwtContext context = jwtConsumer.process(token);
@@ -91,4 +97,132 @@ public class ExternalJwtVerifierImpl extends JwtTokenVerifier {
         }
     }
 
+    /**
+     * Exposes the config UI to the system config page.
+     */
+    @Extension
+    public static class GlobalConfigurationImpl extends GlobalConfiguration {
+
+        private static final String DEFAULT_SSO_URI = "http://dex.sso/";
+        private static final String[] DEFAULT_EXPECTED_AUDIENCE = { "authproxy", "jenkins" };
+
+        private String ssoUri = DEFAULT_SSO_URI;
+        private List<String> audience = Arrays.asList(DEFAULT_EXPECTED_AUDIENCE);
+
+        private transient volatile JwtConsumer jwtConsumer;
+
+        public GlobalConfigurationImpl() {
+            load();
+            buildConsumer();
+        }
+
+        @Override
+        public GlobalConfigurationCategory getCategory() {
+            return GlobalConfigurationCategory.get(GlobalConfigurationCategory.Security.class);
+        }
+
+        @Restricted(NoExternalUse.class) // public for form binding only
+        @SuppressWarnings("unused")
+        public String getSsoUri() {
+            Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+            return ssoUri;
+        }
+
+        @Restricted(NoExternalUse.class) // public for form binding only
+        public List<String> getAudience() {
+            Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+            return audience;
+        }
+
+        private JwtConsumer getJwtConsumer() {
+            return jwtConsumer;
+        }
+
+        private void buildConsumer() {
+            jwtConsumer = new JwtConsumerBuilder()
+                .setRequireExpirationTime() // the JWT must have an expiration time
+                .setAllowedClockSkewInSeconds(30) // allow some leeway in validating time based claims to account for clock skew
+                .setRequireSubject() // the JWT must have a subject claim
+                .setVerificationKeyResolver( new HttpsJwksVerificationKeyResolver(new HttpsJwks(ssoUri)))
+                .setExpectedAudience(audience.toArray(new String[audience.size()]))
+                .build(); // create the JwtConsumer instance
+        }
+
+        @Restricted(NoExternalUse.class) // public for form binding only
+        @SuppressWarnings("unused")
+        public FormValidation doCheckSsoUri(@QueryParameter String value) {
+            Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+            try {
+                URL u = new URL(value);
+                return FormValidation.ok();
+            } catch (MalformedURLException mUrlex) {
+                return FormValidation.error(mUrlex, "The URI is not valid");
+            }
+        }
+
+
+        @Restricted(NoExternalUse.class) // public for form binding only
+        @SuppressWarnings("unused")
+        public FormValidation doCheckAudience(@QueryParameter String value) {
+            Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+            // TODO what validation can we have here?
+            return FormValidation.ok();
+        }
+
+
+        @Override
+        public boolean configure(StaplerRequest req, JSONObject json) throws FormException {
+            Jenkins.get().checkPermission(Jenkins.ADMINISTER);
+            String _ssoUri;
+            List<String> _audience;
+            try {
+                _ssoUri = json.getString("ssoUri");
+                FormValidation fv = doCheckSsoUri(_ssoUri);
+                if (FormValidation.Kind.ERROR == fv.kind) {
+                    throw new FormException(fv.getMessage(), fv.getCause(), "ssoUri");
+                }
+            } catch (JSONException jex) {
+                throw new FormException(jex, "ssoUri");
+            }
+            try {
+                String rawAudience = json.getString("audience");
+                FormValidation fv = doCheckAudience(rawAudience);
+                if (FormValidation.Kind.ERROR == fv.kind) {
+                    throw new FormException(fv.getMessage(), fv.getCause(), "audience");
+                }
+                _audience = toStringList(rawAudience);
+            } catch (JSONException jex) {
+                throw new FormException(jex, "audience");
+            }
+            ssoUri = _ssoUri;
+            audience = _audience;
+            buildConsumer();
+            save();
+            return true;
+        }
+
+        @Override
+        public String getDisplayName() {
+            return "External JWT Verifier";
+        }
+
+        @Restricted(NoExternalUse.class) // public for jelly access workaround JENKINS-27901
+        public String joinWithNewLines(List<String> strArr) {
+            return String.join("\n", strArr);
+        }
+
+        private static List<String> toStringList(String newLineSeparatedValues) {
+            if (newLineSeparatedValues == null) {
+                return null;
+            }
+            ArrayList<String> values = new ArrayList<>();
+            for (String line : newLineSeparatedValues.split("\r?\n")) {
+                line = line.trim();
+                if (!line.isEmpty()) {
+                    values.add(line);
+                }
+            }
+            return values;
+        }
+    }
 }
